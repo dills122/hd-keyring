@@ -1,0 +1,10 @@
+{
+  "name": "@thesis-co/prettier-config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.json",
+  "license": "MIT",
+  "peerDependencies": {
+    "prettier": ">=2 <4"
+  }
+}

@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: true
+
+verifyDepsBeforeRun: false
+
+overrides:
+  "@thesis-co/eslint-config>@thesis-co/prettier-config": "link:./config/thesis-prettier-config"

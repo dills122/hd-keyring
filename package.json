@@ -3,6 +3,7 @@
   "author": "Matt Luongo <mhluongo@gmail.com>",
   "version": "0.6.0-alpha",
   "license": "GPL-3.0",
+  "packageManager": "pnpm@11.20.0",
   "prettier": {
     "semi": false,
     "trailingComma": "es5"
