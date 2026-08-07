@@ -6,9 +6,10 @@ import { Wallet } from "@ethersproject/wallet"
 
 import { generateMnemonic } from "bip39"
 
-import { normalizeHexAddress, validateAndFormatMnemonic } from "./utils"
+import { normalizeEVMAddress, validateAndFormatMnemonic } from "./utils"
 
 export {
+  normalizeEVMAddress,
   normalizeHexAddress,
   normalizeMnemonic,
   toChecksumAddress,
@@ -146,7 +147,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
     address: string,
     transaction: TransactionRequest
   ): Promise<string> {
-    const normAddress = normalizeHexAddress(address)
+    const normAddress = normalizeEVMAddress(address)
     if (!this.#addressToWallet[normAddress]) {
       throw new Error("Address not found!")
     }
@@ -159,7 +160,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
     types: Record<string, Array<TypedDataField>>,
     value: Record<string, unknown>
   ): Promise<string> {
-    const normAddress = normalizeHexAddress(address)
+    const normAddress = normalizeEVMAddress(address)
     if (!this.#addressToWallet[normAddress]) {
       throw new Error("Address not found!")
     }
@@ -172,7 +173,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
   }
 
   async signMessage(address: string, message: string): Promise<string> {
-    const normAddress = normalizeHexAddress(address)
+    const normAddress = normalizeEVMAddress(address)
     if (!this.#addressToWallet[normAddress]) {
       throw new Error("Address not found!")
     }
@@ -188,7 +189,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
         "signMessageBytes cannot be used to sign strings or hex strings; please convert to a byte array first."
       )
     }
-    const normAddress = normalizeHexAddress(address)
+    const normAddress = normalizeEVMAddress(address)
     if (!this.#addressToWallet[normAddress]) {
       throw new Error("Address not found!")
     }
@@ -196,9 +197,16 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
   }
 
   addAddressesSync(numNewAccounts = 1): string[] {
+    if (!Number.isInteger(numNewAccounts) || numNewAccounts < 0) {
+      throw new Error("New account count must be a non-negative integer")
+    }
+    if (numNewAccounts === 0) {
+      return []
+    }
+
     const numAddresses = this.#addressIndex
 
-    if (numNewAccounts < 0 || numAddresses + numNewAccounts > 2 ** 31 - 1) {
+    if (numAddresses + numNewAccounts > 2 ** 31 - 1) {
       throw new Error("New account index out of range")
     }
 
@@ -222,7 +230,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
     const wallet = new Wallet(childNode.privateKey)
 
     this.#wallets.push(wallet)
-    const address = normalizeHexAddress(wallet.address)
+    const address = normalizeEVMAddress(wallet.address)
     this.#addressToWallet[address] = wallet
   }
 
@@ -234,7 +242,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
       confirmation ===
       "I solemnly swear that I am treating this private key material with great care."
     ) {
-      const wallet = this.#addressToWallet[address]
+      const wallet = this.#addressToWallet[normalizeEVMAddress(address)]
       return wallet ? wallet.privateKey : null
     }
     throw new Error(
@@ -243,7 +251,7 @@ export default class HDKeyring implements Keyring<SerializedHDKeyring> {
   }
 
   getAddressesSync(): string[] {
-    return this.#wallets.map((w) => normalizeHexAddress(w.address))
+    return this.#wallets.map((w) => normalizeEVMAddress(w.address))
   }
 
   async getAddresses(): Promise<string[]> {
