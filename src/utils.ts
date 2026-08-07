@@ -19,9 +19,7 @@ export function validateAndFormatMnemonic(
 
 export function normalizeHexAddress(address: string | Buffer): string {
   const addressString =
-    typeof address === "object" && !("toLowerCase" in address)
-      ? address.toString("hex")
-      : address
+    typeof address === "string" ? address : address.toString("hex")
   const noPrefix = addressString.replace(/^0x/, "")
   const even = noPrefix.length % 2 === 0 ? noPrefix : `0${noPrefix}`
   return `0x${Buffer.from(even, "hex").toString("hex")}`
