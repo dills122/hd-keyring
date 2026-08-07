@@ -45,6 +45,9 @@ importers:
       '@thesis-co/eslint-config':
         specifier: 0.6.1
         version: 0.6.1(eslint@8.57.1(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(typescript@5.9.3)
+      '@types/jest':
+        specifier: 29.5.14
+        version: 29.5.14
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
