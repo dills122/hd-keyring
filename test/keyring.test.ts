@@ -9,7 +9,7 @@ import {
 import { keccak256 } from "@ethersproject/keccak256"
 import { TransactionRequest } from "@ethersproject/abstract-provider"
 import { toUtf8Bytes } from "@ethersproject/strings"
-import HDKeyring from "../src"
+import HDKeyring, { toChecksumAddress } from "../src"
 
 const validMnemonics = [
   "square time hurdle gospel crash uncle flash tomorrow city space shine sad fence ski harsh salt need edit name fold corn chuckle resource else",
@@ -119,7 +119,36 @@ describe("HDKeyring", () => {
     expect(keyring.exportPrivateKey(address2, exportConfirmation)).toBe(
       "0x7047d92e716734c2b132a5b7a81588879ade8953ba55bc06a169b8acc3958806"
     )
-    expect(keyring.exportPrivateKey("0xABC", exportConfirmation)).toBe(null)
+    expect(
+      keyring.exportPrivateKey(
+        "0x0000000000000000000000000000000000000001",
+        exportConfirmation
+      )
+    ).toBe(null)
+  })
+  it("rejects malformed addresses before exporting private keys", () => {
+    const keyring = new HDKeyring({ mnemonic: validMnemonics[0] })
+
+    expect(() => keyring.exportPrivateKey("0xABC", exportConfirmation)).toThrow(
+      "Invalid EVM address"
+    )
+  })
+  it("rejects malformed addresses before signing", async () => {
+    const keyring = new HDKeyring({ mnemonic: validMnemonics[0] })
+
+    await expect(keyring.signMessage("0xABC", "message")).rejects.toThrow(
+      "Invalid EVM address"
+    )
+  })
+  it("exports private keys when the derived address uses checksum casing", async () => {
+    const keyring = new HDKeyring({
+      mnemonic: validMnemonics[0],
+    })
+    const [address] = await keyring.addAddresses()
+
+    expect(
+      keyring.exportPrivateKey(toChecksumAddress(address), exportConfirmation)
+    ).toBe("0x6cf5a2031e021b257730ba62c7dff36829d4e5296a08b6115f7be166c03e1a46")
   })
   it("serializes its mnemonic", async () => {
     await Promise.all(
@@ -203,7 +232,7 @@ describe("HDKeyring", () => {
         expect(addresses.length).toEqual(10)
         expect(new Set(addresses).size).toEqual(10)
 
-        allAddresses.concat(addresses)
+        allAddresses.push(...addresses)
       })
     )
     expect(new Set(allAddresses).size).toEqual(allAddresses.length)
@@ -247,6 +276,24 @@ describe("HDKeyring", () => {
         .map(({ status }) => status)
         .every((status) => status === "rejected")
     ).toEqual(true)
+  })
+  it("rejects non-integer account counts without corrupting state", () => {
+    const keyring = new HDKeyring({ mnemonic: validMnemonics[0] })
+    const invalidCounts = [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]
+
+    invalidCounts.forEach((count) => {
+      expect(() => keyring.addAddressesSync(count)).toThrow()
+      expect(keyring.getAddressesSync()).toStrictEqual([])
+      expect(keyring.serializeSync().addressIndex).toBe(0)
+    })
+  })
+  it("returns no new addresses when adding zero accounts", () => {
+    const keyring = new HDKeyring({ mnemonic: validMnemonics[0] })
+    keyring.addAddressesSync()
+
+    expect(keyring.addAddressesSync(0)).toStrictEqual([])
+    expect(keyring.getAddressesSync()).toHaveLength(1)
+    expect(keyring.serializeSync().addressIndex).toBe(1)
   })
   it("generates addresses without off-by-one errors", async () => {
     await Promise.all(
@@ -364,11 +411,13 @@ describe("HDKeyring", () => {
         const keyring = new HDKeyring({ mnemonic: m })
 
         const addresses = await keyring.addAddresses(2)
-        addresses.forEach(async (address) => {
-          const message = "recoverThisMessage"
-          const sig = await keyring.signMessage(address, message)
-          expect(verifyMessage(message, sig).toLowerCase()).toEqual(address)
-        })
+        await Promise.all(
+          addresses.map(async (address) => {
+            const message = "recoverThisMessage"
+            const sig = await keyring.signMessage(address, message)
+            expect(verifyMessage(message, sig).toLowerCase()).toEqual(address)
+          })
+        )
       })
     )
   })
@@ -378,14 +427,16 @@ describe("HDKeyring", () => {
         const keyring = new HDKeyring({ mnemonic: m })
 
         const addresses = await keyring.addAddresses(2)
-        addresses.forEach(async (address) => {
-          const message = "recoverThisMessage"
-          const sig = await keyring.signMessageBytes(
-            address,
-            toUtf8Bytes(message)
-          )
-          expect(verifyMessage(message, sig).toLowerCase()).toEqual(address)
-        })
+        await Promise.all(
+          addresses.map(async (address) => {
+            const message = "recoverThisMessage"
+            const sig = await keyring.signMessageBytes(
+              address,
+              toUtf8Bytes(message)
+            )
+            expect(verifyMessage(message, sig).toLowerCase()).toEqual(address)
+          })
+        )
       })
     )
   })
@@ -395,14 +446,16 @@ describe("HDKeyring", () => {
         const keyring = new HDKeyring({ mnemonic: m })
 
         const addresses = await keyring.addAddresses(2)
-        addresses.forEach(async (address) => {
-          const message = "recoverThisMessage"
-          expect(
-            await keyring
-              .signMessageBytes(address, message as unknown as Bytes)
-              .catch(() => "error")
-          ).toEqual("error")
-        })
+        await Promise.all(
+          addresses.map(async (address) => {
+            const message = "recoverThisMessage"
+            await expect(
+              keyring.signMessageBytes(address, message as unknown as Bytes)
+            ).rejects.toThrow(
+              "signMessageBytes cannot be used to sign strings or hex strings"
+            )
+          })
+        )
       })
     )
   })
@@ -412,24 +465,26 @@ describe("HDKeyring", () => {
         const keyring = new HDKeyring({ mnemonic: m })
 
         const addresses = await keyring.addAddresses(2)
-        addresses.forEach(async (address) => {
-          const tx: TransactionRequest = {
-            to: address,
-            value: 300000,
-            gasLimit: 300000,
-            gasPrice: 300000,
-            nonce: 300000,
-          }
-          const signedTx = await keyring.signTransaction(address, tx)
-          const parsed = parse(signedTx)
-          const sig = {
-            r: parsed.r as string,
-            s: parsed.s as string,
-            v: parsed.v as number,
-          }
-          const digest = keccak256(serialize(<UnsignedTransaction>tx))
-          expect(recoverAddress(digest, sig).toLowerCase()).toEqual(address)
-        })
+        await Promise.all(
+          addresses.map(async (address) => {
+            const tx: TransactionRequest = {
+              to: address,
+              value: 300000,
+              gasLimit: 300000,
+              gasPrice: 300000,
+              nonce: 300000,
+            }
+            const signedTx = await keyring.signTransaction(address, tx)
+            const parsed = parse(signedTx)
+            const sig = {
+              r: parsed.r as string,
+              s: parsed.s as string,
+              v: parsed.v as number,
+            }
+            const digest = keccak256(serialize(<UnsignedTransaction>tx))
+            expect(recoverAddress(digest, sig).toLowerCase()).toEqual(address)
+          })
+        )
       })
     )
   })
@@ -439,39 +494,46 @@ describe("HDKeyring", () => {
         const keyring = new HDKeyring({ mnemonic: m })
 
         const addresses = await keyring.addAddresses(2)
-        addresses.forEach(async (address) => {
-          const domain = {
-            name: "Ether Mail",
-            version: "1",
-            chainId: 1,
-            verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
-          }
+        await Promise.all(
+          addresses.map(async (address) => {
+            const domain = {
+              name: "Ether Mail",
+              version: "1",
+              chainId: 1,
+              verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+            }
 
-          const types = {
-            Person: [{ name: "name", type: "string" }],
-            Mail: [
-              { name: "from", type: "Person" },
-              { name: "to", type: "Person" },
-              { name: "contents", type: "string" },
-            ],
-          }
+            const types = {
+              Person: [{ name: "name", type: "string" }],
+              Mail: [
+                { name: "from", type: "Person" },
+                { name: "to", type: "Person" },
+                { name: "contents", type: "string" },
+              ],
+            }
 
-          const value = {
-            contents: "Hello, Bob!",
-            from: {
-              name: "Alice",
-            },
-            to: {
-              name: "Bob",
-            },
-          }
+            const value = {
+              contents: "Hello, Bob!",
+              from: {
+                name: "Alice",
+              },
+              to: {
+                name: "Bob",
+              },
+            }
 
-          const sig = await keyring.signTypedData(address, domain, types, value)
+            const sig = await keyring.signTypedData(
+              address,
+              domain,
+              types,
+              value
+            )
 
-          expect(
-            verifyTypedData(domain, types, value, sig).toLowerCase()
-          ).toEqual(address)
-        })
+            expect(
+              verifyTypedData(domain, types, value, sig).toLowerCase()
+            ).toEqual(address)
+          })
+        )
       })
     )
   })

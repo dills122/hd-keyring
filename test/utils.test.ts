@@ -1,4 +1,6 @@
 import {
+  isValidChecksumAddress,
+  normalizeEVMAddress,
   normalizeMnemonic,
   normalizeHexAddress,
   validateAndFormatMnemonic,
@@ -21,8 +23,13 @@ describe("utils", () => {
     const m1 = "ABE fish onE  "
     expect(normalizeMnemonic(m1)).toEqual("abe fish one")
   })
+  it("normalizes repeated whitespace throughout mnemonics", () => {
+    const mnemonic = "  ABE\r\nfish\tone   more  "
+    expect(normalizeMnemonic(mnemonic)).toEqual("abe fish one more")
+  })
   it("normalizes addresses", () => {
     const testCases = [
+      ["0x", "0x"],
       ["123abEd", "0x0123abed"],
       ["0x3ABCDEF123456789", "0x3abcdef123456789"],
       [Buffer.from("123456", "hex"), "0x123456"],
@@ -31,6 +38,33 @@ describe("utils", () => {
     testCases.forEach(([input, expectedOutput]) =>
       expect(normalizeHexAddress(input)).toEqual(expectedOutput)
     )
+  })
+  it("normalizes 20-byte EVM addresses", () => {
+    const address = "0x6549F4939460DE12611948B3F82B88C3C8975323"
+    const expected = "0x6549f4939460de12611948b3f82b88c3c8975323"
+
+    expect(normalizeEVMAddress(address)).toBe(expected)
+    expect(normalizeEVMAddress(address.slice(2))).toBe(expected)
+    expect(normalizeEVMAddress(Buffer.from(address.slice(2), "hex"))).toBe(
+      expected
+    )
+  })
+  it("rejects values that are not 20-byte EVM addresses", () => {
+    const invalidAddresses = [
+      "0x",
+      "0x1234",
+      "0x1234nope",
+      "0x000000000000000000000000000000000000000000",
+    ]
+
+    invalidAddresses.forEach((address) => {
+      expect(() => normalizeEVMAddress(address)).toThrow("Invalid EVM address")
+    })
+
+    expect(() => normalizeEVMAddress([256])).toThrow("Invalid EVM address")
+  })
+  it("rejects invalid addresses before calculating a checksum", () => {
+    expect(() => toChecksumAddress("0x1234")).toThrow("Invalid EVM address")
   })
 
   it("normalized addresses to checksum", () => {
@@ -76,6 +110,9 @@ describe("utils", () => {
     testCases.forEach(([input, expectedOutput]) =>
       expect(toChecksumAddress(input)).toEqual(expectedOutput)
     )
+
+    expect(isValidChecksumAddress(testCases[0][1])).toBe(true)
+    expect(isValidChecksumAddress(testCases[0][0])).toBe(false)
   })
 
   it("normalize addresses to checksum, given eth_mainnet chainId", () => {

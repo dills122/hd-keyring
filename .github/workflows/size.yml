@@ -13,12 +13,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v7
 
-      - name: Set up pnpm and Node 22
-        uses: pnpm/setup@v2
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
         with:
-          runtime: node@22
-          cache: true
-          install: false
+          node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
