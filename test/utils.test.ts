@@ -1,3 +1,5 @@
+import { wordlists } from "@ethersproject/wordlists"
+
 import {
   normalizeMnemonic,
   normalizeHexAddress,
@@ -148,6 +150,15 @@ describe("utils", () => {
   it("validates and formats mnemonics", () => {
     twelveOrMoreWordMnemonics.forEach((valid) =>
       expect(validateAndFormatMnemonic(valid)).toEqual(valid)
+    )
+  })
+  it("validates mnemonics against a custom wordlist", () => {
+    const englishWords = Array.from({ length: 2048 }, (_, index) =>
+      wordlists.en.getWord(index)
+    )
+
+    expect(validateAndFormatMnemonic(validMnemonics[0], englishWords)).toEqual(
+      validMnemonics[0]
     )
   })
 })

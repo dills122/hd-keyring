@@ -4,6 +4,31 @@ A class to manage [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.
 
 Built to power [Tally](https://tally.cash), the community owned and operated Web3 wallet.
 
+## Node and browser usage
+
+The package publishes separate Node and browser builds behind the same import.
+Node uses the operating system's cryptographically secure random source, while
+browser-aware bundlers select a build that generates mnemonic entropy with the
+native Web Crypto API (`globalThis.crypto.getRandomValues`). No Node `crypto` or
+`Buffer` shim is required by the browser entry.
+
+```ts
+import HDKeyring from "@tallyho/hd-keyring"
+
+const keyring = new HDKeyring()
+const [address] = await keyring.addAddresses()
+```
+
+Mnemonic generation requires Web Crypto. Loading an existing mnemonic does not:
+
+```ts
+const restored = new HDKeyring({ mnemonic: "..." })
+```
+
+The browser build supports environments with `crypto.getRandomValues`, including
+Web Workers. Node and browser builds expose the same keyring API and serialized
+format.
+
 ## Building and Developing
 
 ### Development Setup
@@ -33,6 +58,9 @@ $ yarn install # install all dependencies; rerun with --ignore-scripts if
                # scrypt node-gyp failures prevent the install from completing
 $ yarn test --watch # start a continuous test that will auto-run with changes
 ```
+
+To verify both package builds and execute the browser bundle against a Web
+Crypto-only runtime, run `yarn test:browser`.
 
 Once the continuous test build is running, you can make whatever changes to
 the code and make sure tests continue to pass.
