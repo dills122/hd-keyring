@@ -51,7 +51,7 @@ in Discord before going all in.
 
 Before marking the PR as ready for review, make sure:
 
-- It passes the linter checks (`yarn lint`).
+- It passes the linter checks (`pnpm lint`).
 - All commits are
   [signed](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
 - It passes the GitHub checks on GitHub.

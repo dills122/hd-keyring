@@ -1,12 +1,32 @@
 name: size
 on: [pull_request]
+
+permissions:
+  contents: read
+
 jobs:
   size:
     runs-on: ubuntu-latest
     env:
       CI_JOB_NUMBER: 1
     steps:
-      - uses: actions/checkout@v1
-      - uses: andresz1/size-limit-action@v1
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check bundle size
+        run: pnpm size
