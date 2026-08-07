@@ -40,3 +40,6 @@ jobs:
 
       - name: Build
         run: yarn build
+
+      - name: Browser bundle smoke test
+        run: node scripts/browser-smoke.js

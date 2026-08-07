@@ -1,5 +1,28 @@
-import { validateMnemonic } from "bip39"
+import { Bytes, hexlify } from "@ethersproject/bytes"
+import { isValidMnemonic } from "@ethersproject/hdnode"
 import { keccak256 } from "@ethersproject/keccak256"
+import { toUtf8Bytes } from "@ethersproject/strings"
+import { Wordlist } from "@ethersproject/wordlists"
+
+class ArrayWordlist extends Wordlist {
+  readonly #words: string[]
+
+  readonly #indices: Map<string, number>
+
+  constructor(words: string[]) {
+    super("custom")
+    this.#words = words
+    this.#indices = new Map(words.map((word, index) => [word, index]))
+  }
+
+  getWord(index: number): string {
+    return this.#words[index]
+  }
+
+  getWordIndex(word: string): number {
+    return this.#indices.get(word) ?? -1
+  }
+}
 
 export function normalizeMnemonic(mnemonic: string): string {
   return mnemonic.trim().toLowerCase().replace(/\r/, " ").replace(/ +/, " ")
@@ -11,18 +34,19 @@ export function validateAndFormatMnemonic(
 ): string | null {
   const normalized = normalizeMnemonic(mnemonic)
 
-  if (validateMnemonic(normalized, wordlist)) {
+  const ethersWordlist = wordlist ? new ArrayWordlist(wordlist) : undefined
+
+  if (isValidMnemonic(normalized, ethersWordlist)) {
     return normalized
   }
   return null
 }
 
-export function normalizeHexAddress(address: string | Buffer): string {
-  const addressString =
-    typeof address === "string" ? address : address.toString("hex")
+export function normalizeHexAddress(address: string | Bytes): string {
+  const addressString = typeof address === "string" ? address : hexlify(address)
   const noPrefix = addressString.replace(/^0x/, "")
   const even = noPrefix.length % 2 === 0 ? noPrefix : `0${noPrefix}`
-  return `0x${Buffer.from(even, "hex").toString("hex")}`
+  return hexlify(`0x${even}`).toLowerCase()
 }
 
 export function toChecksumAddress(address: string, chainId?: number): string {
@@ -33,7 +57,7 @@ export function toChecksumAddress(address: string, chainId?: number): string {
   const prefix =
     chainId && whitelistedChainIds.includes(chainId) ? `${chainId}0x` : ""
   const hash = keccak256(
-    Buffer.from(`${prefix}${addressWithOutPrefix}`, "ascii")
+    toUtf8Bytes(`${prefix}${addressWithOutPrefix}`)
   ).replace("0x", "")
 
   const checkSum = Array.from(addressWithOutPrefix)
